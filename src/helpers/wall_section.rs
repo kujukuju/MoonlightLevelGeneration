@@ -3,23 +3,41 @@ use std::f32::consts::PI;
 use crate::math_helper::MathHelper;
 
 pub struct WallSection {
-    lines: Vec<[f32; 2]>,
+    pub lines: Vec<[f32; 2]>,
 }
 
 impl WallSection {
-    pub fn render(&mut self, generator: &mut Generator) {
+    pub fn render(&mut self, generator: &mut Generator, color: u32) {
         for index in 0..(self.lines.len() - 1) {
             let next_index = index + 1;
 
             let point = self.lines[index];
             let next_point = self.lines[next_index];
 
-            generator.draw_line(point[0], point[1], next_point[0], next_point[1], 0xff0000, 1.0);
+            generator.draw_line(point[0], point[1], next_point[0], next_point[1], color, 1.0);
         }
     }
 
     pub fn add_point(&mut self, point: &[f32; 2]) {
         self.lines.push(point.clone());
+    }
+
+    pub fn distance_to_wall(&self, point: &[f32; 2]) -> ([f32; 2], f32) {
+        let mut min_point: Option<[f32; 2]> = None;
+        let mut min_distance = f32::MAX;
+
+        for index in 0..(self.lines.len() - 1) {
+            let current_point = self.lines[index];
+            let next_point = self.lines[index + 1];
+
+            let (point, distance) = MathHelper::distance_to_line_segment(&[current_point, next_point], point);
+            if distance < min_distance {
+                min_point = Some(point);
+                min_distance = distance;
+            }
+        }
+
+        return (min_point.unwrap(), min_distance);
     }
 
     pub fn thicken(&mut self, generator: &mut Generator, start_thickness: f32, end_thickness: f32) -> [WallSection; 2] {
@@ -60,7 +78,7 @@ impl WallSection {
             let thickness_mod = perlin * 8.0 - 0.5;
             // let thickness_mod = thickness_mod + generator.get_perlin_value(point[0], point[1], 0.1) * 400.0;
             let thickness = (index as f32 / (self.lines.len() - 1) as f32) * (end_thickness - start_thickness) + start_thickness;
-            let thickness = thickness * thickness_mod;
+            let thickness = (thickness * thickness_mod).max(200.0);
             wall_1.add_point(&[point[0] + normal.cos() * thickness, point[1] + normal.sin() * thickness]);
             wall_2.add_point(&[point[0] - normal.cos() * thickness, point[1] - normal.sin() * thickness]);
         }
