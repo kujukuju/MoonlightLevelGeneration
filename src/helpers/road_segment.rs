@@ -50,6 +50,8 @@ impl RoadSegment {
             let next_segment_length = 250.0 + 850.0 * generator.next();
 
             // angle = MathHelper::round_to_interval(angle, PI / 8.0);
+            // rounded angles aren't necessary here, but it leads to more interesting roads
+            // because they tend to not overlap exactly and spread out more
             let real_angle = MathHelper::round_to_interval(angle, PI / 8.0);
             point[0] += real_angle.cos() * next_segment_length;
             point[1] += real_angle.sin() * next_segment_length;

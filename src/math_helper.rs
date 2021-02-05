@@ -103,4 +103,21 @@ impl MathHelper {
 
         return dx * dx + dy * dy <= 1.0;
     }
+
+    pub fn hermite(t: f32, points: [[f32; 2]; 2], tangentials: [[f32; 2]; 2]) -> [f32; 2] {
+        let n1 = 2.0 * t * t * t - 3.0 * t * t + 1.0;
+        let n2 = t * t * t - 2.0 * t * t + t;
+        let n3 = -2.0 * t * t * t + 3.0 * t * t;
+        let n4 = t * t * t - t * t;
+
+        return [
+            n1 * points[0][0] + n2 * tangentials[0][0] + n3 * points[1][0] + n4 * tangentials[1][0],
+            n1 * points[0][1] + n2 * tangentials[0][1] + n3 * points[1][1] + n4 * tangentials[1][1],
+        ];
+    }
+
+    pub fn ease_in_out(t: f32) -> f32 {
+        let p = 2.0 * t * t;
+        return if t < 0.5 {p} else {-p + (4.0 * t) - 1.0};
+    }
 }

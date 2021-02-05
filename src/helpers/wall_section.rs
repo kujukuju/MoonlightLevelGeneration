@@ -18,6 +18,216 @@ impl WallSection {
         }
     }
 
+    pub fn connect_points_linear(&mut self, generator: &mut Generator, point1: [f32; 2], point2: [f32; 2]) {
+        let dx = point2[0] - point1[0];
+        let dy = point2[1] - point1[1];
+        let distance = (dx * dx + dy * dy).sqrt();
+
+        let steps = (distance / 800.0).ceil() as i32;
+
+        self.add_point(&point1);
+
+        for i in 1..steps {
+            let progress = i as f32 / steps as f32;
+
+            let point = [point1[0] + dx * progress, point1[1] + dy * progress];
+            self.add_point(&point);
+        }
+
+        self.add_point(&point2);
+
+        // for i in 1..(self.lines.len() - 1) {
+        //     let point = &mut self.lines[i];
+        //
+        //     let perlin = generator.get_perlin_value(point[0] + 52365.0, point[1] + 75632.0, 1.0);
+        //     let dx = point[0];
+        //     let dy = point[1];
+        //     let d = (dx * dx + dy * dy).sqrt();
+        //
+        //     // let perlin2 = generator.get_perlin_value(point[0] - 457643.0, point[1] + 156453.0, 10.0);
+        //
+        //     let dx = dx / d;
+        //     let dy = dy / d;
+        //
+        //     point[0] += dx * perlin * 400.0 + dx * perlin2 * 2400.0;
+        //     point[1] += dy * perlin * 400.0 + dy * perlin2 * 2400.0;
+        // }
+    }
+
+    pub fn connect_points(&mut self, generator: &mut Generator, point1: [f32; 2], tangent1: [f32; 2], point2: [f32; 2], tangent2: [f32; 2]) {
+        let d1 = (point1[0] * point1[0] + point1[1] * point1[1]).sqrt();
+        let d2 = (point2[0] * point2[0] + point2[1] * point2[1]).sqrt();
+
+        let ang1 = point1[1].atan2(point1[0]);
+        let ang2 = point2[1].atan2(point2[0]);
+        let delta_ang = MathHelper::radians_between_angles(ang1, ang2);
+
+        self.add_point(&point1);
+
+        let iterations = (delta_ang.abs() / 0.002).ceil() as i32;
+        for i in 1..iterations {
+            let progress = i as f32 / iterations as f32;
+            let point = MathHelper::hermite(
+                progress,
+                [point1, point2],
+                [tangent1, [-tangent2[0], -tangent2[1]]]);
+
+            self.add_point(&point);
+
+            // let ang = ang1 + (delta_ang / iterations as f32) * i as f32;
+            //
+            // let d = d1 + (d2 - d1) * progress;
+            //
+            // self.add_point(&[ang.cos() * d, ang.sin() * d]);
+        }
+
+        self.add_point(&point2);
+
+        // let mut center_point = [
+        //     (point1[0] + point2[0]) / 2.0,
+        //     (point1[1] + point2[1]) / 2.0,
+        // ];
+        // // move the center point slightly more back towards the center
+        // let center_dist = (center_point[0] * center_point[0] + center_point[1] * center_point[1]).sqrt();
+        // center_point[0] -= center_point[0] / center_dist * 10000.0;
+        // center_point[1] -= center_point[1] / center_dist * 10000.0;
+        //
+        // for i in 1..(self.lines.len() - 1) {
+        //     let point = &mut self.lines[i];
+        //
+        //     let perlin = generator.get_perlin_value(point[0] + 56342.0, point[1] + 90678.0, 1.0);
+        //     let dx = point[0] - center_point[0];
+        //     let dy = point[1] - center_point[1];
+        //     let d = (dx * dx + dy * dy).sqrt();
+        //
+        //     let dx = dx / d;
+        //     let dy = dy / d;
+        //
+        //     point[0] += dx * perlin * 400.0;
+        //     point[1] += dy * perlin * 400.0;
+        // }
+    }
+
+    pub fn noiseify(&mut self, generator: &mut Generator, strength: f32, scale: f32, center: [f32; 2]) {
+        for i in 1..(self.lines.len() - 1) {
+            let progress = i as f32 / (self.lines.len() - 1) as f32;
+            let ease = MathHelper::ease_in_out((progress * 2.0).min(1.0));
+            let ease = ease.min(MathHelper::ease_in_out(((1.0 - progress) * 2.0).min(1.0)));
+
+            let point = &mut self.lines[i];
+
+            let perlin = generator.get_perlin_value(point[0] + 56342.0, point[1] + 90678.0, scale);
+            let dx = point[0] - center[0];
+            let dy = point[1] - center[1];
+            let d = (dx * dx + dy * dy).sqrt();
+
+            let dx = dx / d;
+            let dy = dy / d;
+
+            point[0] += dx * perlin * strength * ease;
+            point[1] += dy * perlin * strength * ease;
+        }
+    }
+
+    pub fn join_wall(&mut self, mut wall: WallSection) {
+        if self.lines[0][0] == wall.lines[wall.lines.len() - 1][0] && self.lines[0][1] == wall.lines[wall.lines.len() - 1][1] {
+            for vertex in self.lines.drain(1..) {
+                wall.lines.push(vertex);
+            }
+            self.lines = wall.lines;
+        } else if self.lines[self.lines.len() - 1][0] == wall.lines[0][0] && self.lines[self.lines.len() - 1][1] == wall.lines[0][1] {
+            for vertex in wall.lines.drain(1..) {
+                self.lines.push(vertex);
+            }
+        } else {
+            panic!("Can not join walls that don't share a vertex.");
+        }
+    }
+
+    pub fn get_last_point(&self) -> [f32; 2] {
+        return self.lines[self.lines.len() - 1];
+    }
+
+    pub fn get_length(&self) -> f32 {
+        let mut length = 0.0;
+        for i in 0..(self.lines.len() - 1) {
+            let point = self.lines[i];
+            let next_point = self.lines[i + 1];
+
+            let dx = next_point[0] - point[0];
+            let dy = next_point[1] - point[1];
+            let d = (dx * dx + dy * dy).sqrt();
+
+            length += d;
+        }
+
+        return length;
+    }
+
+    pub fn get_point_at_length(&self, length: f32) -> [f32; 2] {
+        let mut cur_length = 0.0;
+        for i in 0..(self.lines.len() - 1) {
+            let point = self.lines[i];
+            let next_point = self.lines[i + 1];
+
+            let dx = next_point[0] - point[0];
+            let dy = next_point[1] - point[1];
+            let d = (dx * dx + dy * dy).sqrt();
+
+            let prev_length = cur_length;
+            cur_length += d;
+
+            if cur_length >= length {
+                let percent = (cur_length - length) / (cur_length - prev_length);
+
+                return [point[0] + dx * percent, point[1] + dy * percent];
+            }
+        }
+
+        return self.lines[self.lines.len() - 1];
+    }
+
+    pub fn delete_after_length(&mut self, length: f32) {
+        for i in (1..self.lines.len()).rev() {
+            let point = self.lines[i];
+
+            let d = (point[0] * point[0] + point[1] * point[1]).sqrt();
+            if d < length {
+                while self.lines.len() > i + 2 {
+                    self.lines.remove(self.lines.len() - 1);
+                }
+
+                return;
+            }
+        }
+
+        // let mut cur_length = 0.0;
+        // for i in 0..(self.lines.len() - 1) {
+        //     let point = self.lines[i];
+        //     let next_point = &mut self.lines[i + 1];
+        //
+        //     let dx = next_point[0] - point[0];
+        //     let dy = next_point[1] - point[1];
+        //     let d = (dx * dx + dy * dy).sqrt();
+        //
+        //     // let prev_length = cur_length;
+        //     cur_length += d;
+        //
+        //     if cur_length >= length {
+        //         // let percent = (cur_length - length) / (cur_length - prev_length);
+        //
+        //         // next_point[0] = point[0] + dx * percent;
+        //         // next_point[1] = point[1] + dy * percent;
+        //
+        //         while self.lines.len() > i + 2 {
+        //             self.lines.remove(self.lines.len() - 1);
+        //         }
+        //
+        //         return;
+        //     }
+        // }
+    }
+
     pub fn add_point(&mut self, point: &[f32; 2]) {
         self.lines.push(point.clone());
     }

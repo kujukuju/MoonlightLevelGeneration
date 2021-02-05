@@ -128,6 +128,7 @@ impl Generator {
     fn generate_walls(&mut self) {
         // generate the angle for the big area walls
         let t1_t3_angle = self.next() * PI * 2.0;
+        let t1_t3_angle_original = t1_t3_angle;
         let t3_t2_angle = t1_t3_angle + PI;
         let t3_t2_angle = t3_t2_angle + self.next() * PI * 0.1 - PI * 0.05;
 
@@ -141,42 +142,182 @@ impl Generator {
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
         self.fill_wall(&mut t1_t3_wall, 45000.0, t1_t3_angle, t1_t3_angle, 0.02, None);
         let [mut t1_t3_wall_1, mut t1_t3_wall_2] = t1_t3_wall.thicken(self, 200.0, 1200.0);
-        t1_t3_wall.render(self, 0x880044);
-        t1_t3_wall_1.render(self, 0x000044);
-        t1_t3_wall_2.render(self, 0x000044);
 
         let mut t3_t2_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
         self.fill_wall(&mut t3_t2_wall, 45000.0, t3_t2_angle, t3_t2_angle, 0.02, None);
         let [mut t3_t2_wall_1, mut t3_t2_wall_2] = t3_t2_wall.thicken(self, 200.0, 1200.0);
-        t3_t2_wall.render(self, 0x880044);
-        t3_t2_wall_1.render(self, 0x000044);
-        t3_t2_wall_2.render(self, 0x000044);
 
         let mut t2_t1_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
         self.fill_wall(&mut t2_t1_wall, 45000.0, t2_t1_angle, t2_t1_angle, 0.02, Some(&t1_t3_wall_1));
         let [mut t2_t1_wall_1, mut t2_t1_wall_2] = t2_t1_wall.thicken(self, 200.0, 1200.0);
-        t2_t1_wall.render(self, 0x880044);
-        t2_t1_wall_1.render(self, 0x000044);
-        t2_t1_wall_2.render(self, 0x000044);
 
         let [mut t1_wall_inner, mut t1_wall_lower, mut t1_wall_upper] = self.fill_between_wall(&t2_t1_wall_2, &t1_t3_wall_1, 12000.0);
-        t1_wall_inner.render(self, 0x880044);
-        t1_wall_lower.render(self, 0x000044);
-        t1_wall_upper.render(self, 0x000044);
 
         // calculate the road segments at the exact edge of the safe zone
         self.generate_roads(0.0, 0.0, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, 0xff0000, 0.8);
 
+        // back walls
+        let tangent_strength = 24000.0;
 
-        // at the tip of each wall, extend the t3 t2 divider on both sides
+        // t1 upper bounding wall
+        let t1_upper_point = t1_wall_upper.get_last_point();
+        let mut length = (t1_upper_point[0] * t1_upper_point[0] + t1_upper_point[1] * t1_upper_point[1]).sqrt().min(32000.0);
+        t1_wall_upper.delete_after_length(length);
+        let t1_upper_point = t1_wall_upper.get_last_point();
+        let t1_upper_tangent = [t1_upper_point[1].atan2(t1_upper_point[0]).cos() * tangent_strength, t1_upper_point[1].atan2(t1_upper_point[0]).sin() * tangent_strength];
 
-        // extend the t3 t1 divider towards t3
+        t1_t3_wall_1.delete_after_length(length);
+        let t1_t3_point = t1_t3_wall_1.get_last_point();
+        let t1_t3_tangent = [t1_t3_point[1].atan2(t1_t3_point[0]).cos() * tangent_strength, t1_t3_point[1].atan2(t1_t3_point[0]).sin() * tangent_strength];
 
-        // extend the t2 t1 divider towards t2
+        let mut t1_upper_back_wall = WallSection::default();
+        t1_upper_back_wall.connect_points(self, t1_upper_point, t1_upper_tangent, t1_t3_point, t1_t3_tangent);
+        let mut center_point = [
+            (t1_upper_point[0] + t1_t3_point[0]) / 2.0,
+            (t1_upper_point[1] + t1_t3_point[1]) / 2.0,
+        ];
+        // move the center point slightly more back towards the center
+        let center_dist = (center_point[0] * center_point[0] + center_point[1] * center_point[1]).sqrt();
+        center_point[0] -= center_point[0] / center_dist * 10000.0;
+        center_point[1] -= center_point[1] / center_dist * 10000.0;
+        t1_upper_back_wall.noiseify(self, 400.0, 1.0, center_point);
 
+        // t1 lower bounding wall
+        let t1_lower_point = t1_wall_lower.get_last_point();
+        let length = (t1_lower_point[0] * t1_lower_point[0] + t1_lower_point[1] * t1_lower_point[1]).sqrt().min(32000.0);
+        t1_wall_lower.delete_after_length(length);
+        let t1_lower_point = t1_wall_lower.get_last_point();
+        let t1_lower_tangent = [t1_lower_point[1].atan2(t1_lower_point[0]).cos() * tangent_strength, t1_lower_point[1].atan2(t1_lower_point[0]).sin() * tangent_strength];
 
+        t2_t1_wall_2.delete_after_length(length);
+        let t2_t1_point = t2_t1_wall_2.get_last_point();
+        let t2_t1_tangent = [t2_t1_point[1].atan2(t2_t1_point[0]).cos() * tangent_strength, t2_t1_point[1].atan2(t2_t1_point[0]).sin() * tangent_strength];
+
+        let mut t1_lower_back_wall = WallSection::default();
+        t1_lower_back_wall.connect_points(self, t2_t1_point, t2_t1_tangent, t1_lower_point, t1_lower_tangent);
+        let mut center_point = [
+            (t2_t1_point[0] + t1_lower_point[0]) / 2.0,
+            (t2_t1_point[1] + t1_lower_point[1]) / 2.0,
+        ];
+        // move the center point slightly more back towards the center
+        let center_dist = (center_point[0] * center_point[0] + center_point[1] * center_point[1]).sqrt();
+        center_point[0] -= center_point[0] / center_dist * 10000.0;
+        center_point[1] -= center_point[1] / center_dist * 10000.0;
+        t1_lower_back_wall.noiseify(self, 400.0, 1.0, center_point);
+
+        let tangent_strength = 54000.0;
+
+        // t2 bounding wall
+        let mut length = 18000.0;
+        t3_t2_wall_2.delete_after_length(length);
+        let t3_t2_point = t3_t2_wall_2.get_last_point();
+        let t3_t2_tangent = [t3_t2_point[1].atan2(t3_t2_point[0]).cos() * tangent_strength, t3_t2_point[1].atan2(t3_t2_point[0]).sin() * tangent_strength];
+
+        t2_t1_wall_1.delete_after_length(length);
+        let t2_t1_point = t2_t1_wall_1.get_last_point();
+        let t2_t1_tangent = [t2_t1_point[1].atan2(t2_t1_point[0]).cos() * tangent_strength, t2_t1_point[1].atan2(t2_t1_point[0]).sin() * tangent_strength];
+
+        let mut t2_back_wall = WallSection::default();
+        t2_back_wall.connect_points(self, t3_t2_point, t3_t2_tangent, t2_t1_point, t2_t1_tangent);
+        let mut center_point = [
+            (t3_t2_point[0] + t2_t1_point[0]) / 2.0,
+            (t3_t2_point[1] + t2_t1_point[1]) / 2.0,
+        ];
+        // move the center point slightly more back towards the center
+        let center_dist = (center_point[0] * center_point[0] + center_point[1] * center_point[1]).sqrt();
+        center_point[0] -= center_point[0] / center_dist * 10000.0;
+        center_point[1] -= center_point[1] / center_dist * 10000.0;
+        t2_back_wall.noiseify(self, 400.0, 1.0, center_point);
+
+        // t3 back wall
+        let length = 24000.0;
+        t1_t3_wall_2.delete_after_length(length);
+        let t1_t3_point = t1_t3_wall_2.get_last_point();
+        let t1_t3_dist = (t1_t3_point[0] * t1_t3_point[0] + t1_t3_point[1] * t1_t3_point[1]).sqrt();
+        let t1_t3_angle = t1_t3_point[1].atan2(t1_t3_point[0]);
+
+        let length = 18000.0;
+        t3_t2_wall_1.delete_after_length(length);
+        let t3_t2_point = t3_t2_wall_1.get_last_point();
+        let t3_t2_dist = (t3_t2_point[0] * t3_t2_point[0] + t3_t2_point[1] * t3_t2_point[1]).sqrt();
+        let t3_t2_angle = t3_t2_point[1].atan2(t3_t2_point[0]);
+
+        let t1_t3_angle = t1_t3_point[1].atan2(t1_t3_point[0]);
+        let t3_t2_angle = t3_t2_point[1].atan2(t3_t2_point[0]);
+        let mut angle_diff = MathHelper::radians_between_angles(t3_t2_angle, t1_t3_angle);
+        if angle_diff < 0.0 {
+            angle_diff += PI * 2.0;
+        }
+
+        let start_angle_offset = ((angle_diff - (144.0 / 180.0 * PI)).max(15.0 / 180.0 * PI) + (24.0 / 180.0 * PI)).min(50.0 / 180.0 * PI);
+        let start_angle_offset = start_angle_offset;
+        let start_angle = t1_t3_angle - start_angle_offset;
+        // I remember basic trig
+        // adding this back makes it so it doesn't extend as far when bend obtusely or whatever
+        let start_length = t1_t3_dist / (start_angle_offset + MathHelper::radians_between_angles(t1_t3_angle, t1_t3_angle_original).min(0.0)).cos();
+        let start_point = [start_angle.cos() * start_length, start_angle.sin() * start_length];
+
+        let end_angle_offset = 40.0 / 180.0 * PI;
+        let end_length = t3_t2_dist / end_angle_offset.cos();
+        let end_angle = t3_t2_angle + end_angle_offset;
+        let end_point = [end_angle.cos() * end_length, end_angle.sin() * end_length];
+
+        let back_wall_angle = (end_point[1] - start_point[1]).atan2(end_point[0] - start_point[0]);
+
+        let mut t3_back_wall = WallSection::default();
+        t3_back_wall.connect_points_linear(self, start_point, end_point);
+
+        let tangent_strength = 8000.0;
+
+        let mut t1_t3_side_wall = WallSection::default();
+        t1_t3_side_wall.connect_points(
+            self,
+            t1_t3_point,
+            [t1_t3_angle.cos() * tangent_strength, t1_t3_angle.sin() * tangent_strength],
+            start_point,
+            [-back_wall_angle.cos() * tangent_strength, -back_wall_angle.sin() * tangent_strength]);
+        t3_back_wall.join_wall(t1_t3_side_wall);
+
+        let mut t3_t2_side_wall = WallSection::default();
+        t3_t2_side_wall.connect_points(
+            self,
+            end_point,
+            [back_wall_angle.cos() * tangent_strength, back_wall_angle.sin() * tangent_strength],
+            t3_t2_point,
+            [t3_t2_angle.cos() * tangent_strength, t3_t2_angle.sin() * tangent_strength]);
+        t3_back_wall.join_wall(t3_t2_side_wall);
+
+        t3_back_wall.noiseify(self, 8000.0, 20.0, [0.0, 0.0]);
+        t3_back_wall.noiseify(self, 400.0, 1.0, [0.0, 0.0]);
+
+        // self.draw_line(start_point[0], start_point[1], end_point[0], end_point[1], 0xff0000, 1.0);
+
+        // t1_t3_wall.render(self, 0x880044);
+        t1_t3_wall_1.render(self, 0x000044);
+        t1_t3_wall_2.render(self, 0x000044);
+
+        // t3_t2_wall.render(self, 0x880044);
+        t3_t2_wall_1.render(self, 0x000044);
+        t3_t2_wall_2.render(self, 0x000044);
+
+        // t2_t1_wall.render(self, 0x880044);
+        t2_t1_wall_1.render(self, 0x000044);
+        t2_t1_wall_2.render(self, 0x000044);
+
+        // t1_wall_inner.render(self, 0x880044);
+        t1_wall_lower.render(self, 0x000044);
+        t1_wall_upper.render(self, 0x000044);
+
+        t1_upper_back_wall.render(self, 0x440088);
+        t1_lower_back_wall.render(self, 0x440088);
+
+        t2_back_wall.render(self, 0x440088);
+
+        t3_back_wall.render(self, 0x440088);
+        // t1_t3_side_wall.render(self, 0x004488);
+        // t3_t2_side_wall.render(self, 0x004488);
     }
 
     pub fn generate_roads(&mut self, center_x: f32, center_y: f32, width: f32, height: f32, color: u32, alpha: f32) {
@@ -617,7 +758,10 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 3630298371;
+        // let seed: u32 = 136914854;
+
+        // TODO cursed seed to try before finalizing
+        // let seed: u32 = 1835892476;
         println!("SEED {:?}", seed);
 
         return Generator {
