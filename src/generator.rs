@@ -21,7 +21,7 @@ pub const TEXTURE_WIDTH: u32 = 32 * 4;
 pub const TEXTURE_HEIGHT: u32 = 24 * 4;
 
 // this value forces the rendering to be sampled down to 1 / screen_scale
-const SCREEN_SCALE: u32 = 1;
+const SCREEN_SCALE: u32 = 2;
 
 const LEVEL_WIDTH: usize = SCREEN_WIDTH as usize / TILE_WIDTH as usize * SCREEN_SCALE as usize;
 const LEVEL_HEIGHT: usize = SCREEN_HEIGHT as usize / TILE_HEIGHT as usize * SCREEN_SCALE as usize;
@@ -269,8 +269,12 @@ impl Generator {
             }
         }
 
-        for road_segment in &road_segments {
+        for road_segment in &mut road_segments {
+            let children = road_segment.extend(self, 30000.0);
             road_segment.render(self);
+            for child in children {
+                child.render(self);
+            }
         }
     }
 
@@ -535,6 +539,29 @@ impl Generator {
         }
     }
 
+    pub fn draw_line_thickness(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, radius: f32, color: u32, alpha: f32) {
+        let aabb = [
+            [((x1.min(x2) - radius) / TEXTURE_WIDTH as f32).floor() as i32, ((y1.min(y2) - radius) / TEXTURE_HEIGHT as f32).floor() as i32],
+            [((x1.max(x2) + radius) / TEXTURE_WIDTH as f32).ceil() as i32, ((y1.max(y2) + radius) / TEXTURE_HEIGHT as f32).ceil() as i32],
+        ];
+
+        for x in aabb[0][0]..=aabb[1][0] {
+            for y in aabb[0][1]..=aabb[1][1] {
+                let cx = x as f32 * TEXTURE_WIDTH as f32 + TEXTURE_WIDTH as f32 / 2.0;
+                let cy = y as f32 * TEXTURE_HEIGHT as f32 + TEXTURE_HEIGHT as f32 / 2.0;
+
+                if MathHelper::is_point_inside_ellipse([cx, cy], [0.0, 0.0], [SAFE_ZONE_WIDTH - TEXTURE_WIDTH as f32 * 2.0, SAFE_ZONE_HEIGHT - TEXTURE_HEIGHT as f32 * 2.0]) {
+                    continue;
+                }
+
+                let (point, distance) = MathHelper::distance_to_line_segment(&[[x1, y1], [x2, y2]], &[cx, cy]);
+                if distance - 0.000001 <= radius {
+                    self.draw_tile(x, y, color, alpha);
+                }
+            }
+        }
+    }
+
     fn is_tile_grass(&self, x: i32, y: i32) -> bool {
         if let Some(tile_index) = Generator::grid_index((x + LEVEL_WIDTH as i32 / 2) as u32, (y + LEVEL_HEIGHT as i32 / 2) as u32) {
             return self.grass[tile_index];
@@ -578,7 +605,7 @@ impl Generator {
         return Some(index as usize);
     }
 
-    fn next(&mut self) -> f32 {
+    pub fn next(&mut self) -> f32 {
         return self.random.next();
     }
 
@@ -590,7 +617,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 2873571609;
+        // let seed: u32 = 3630298371;
         println!("SEED {:?}", seed);
 
         return Generator {
