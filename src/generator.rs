@@ -2,10 +2,13 @@ use crate::{SCREEN_WIDTH, SCREEN_HEIGHT};
 use line_drawing::Bresenham;
 use crate::perlin::Perlin;
 use crate::random::Random;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::math_helper::MathHelper;
 use crate::helpers::wall_section::WallSection;
 use std::f32::consts::PI;
+use std::hash::{Hash, Hasher};
+use std::cmp::Ordering;
+use crate::helpers::road_segment::RoadSegment;
 
 const NOISE_DETAIL: f32 = 0.0005 / 0.75;
 const APPROX_WIDTH: f32 = 10752.0;
@@ -14,25 +17,55 @@ const APPROX_HEIGHT: f32 = 10752.0;
 const TILE_WIDTH: u32 = 4;
 const TILE_HEIGHT: u32 = 3;
 
-const TEXTURE_WIDTH: u32 = 32 * 4;
-const TEXTURE_HEIGHT: u32 = 24 * 4;
+pub const TEXTURE_WIDTH: u32 = 32 * 4;
+pub const TEXTURE_HEIGHT: u32 = 24 * 4;
 
 // this value forces the rendering to be sampled down to 1 / screen_scale
-const SCREEN_SCALE: u32 = 2;
+const SCREEN_SCALE: u32 = 1;
 
 const LEVEL_WIDTH: usize = SCREEN_WIDTH as usize / TILE_WIDTH as usize * SCREEN_SCALE as usize;
 const LEVEL_HEIGHT: usize = SCREEN_HEIGHT as usize / TILE_HEIGHT as usize * SCREEN_SCALE as usize;
 
 const NEW_SAFE_ZONE_SCALE_MUL: f32 = 2.0;
 
-const SAFE_ZONE_WIDTH: f32 = 3072.0 * NEW_SAFE_ZONE_SCALE_MUL;
-const SAFE_ZONE_HEIGHT: f32 = 2304.0 * NEW_SAFE_ZONE_SCALE_MUL;
+pub const SAFE_ZONE_WIDTH: f32 = 3072.0 * NEW_SAFE_ZONE_SCALE_MUL;
+pub const SAFE_ZONE_HEIGHT: f32 = 2304.0 * NEW_SAFE_ZONE_SCALE_MUL;
 
 pub struct Generator {
     pixels: Vec<u32>,
+    grass: Vec<bool>,
     random: Random,
     noise: Perlin,
     seed: i64,
+}
+
+#[derive(Copy, Clone)]
+pub struct Angle(pub f32);
+
+impl PartialEq for Angle {
+    fn eq(&self, other: &Self) -> bool {
+        let bad_angle1 = (self.0 * 100000.0).round() as i32;
+        let bad_angle2 = (other.0 * 100000.0).round() as i32;
+
+        return bad_angle1 == bad_angle2;
+    }
+}
+
+impl PartialOrd for Angle {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let bad_angle1 = (self.0 * 100000.0).round() as i32;
+        let bad_angle2 = (other.0 * 100000.0).round() as i32;
+        return Some(bad_angle1.cmp(&bad_angle2));
+    }
+}
+
+impl Eq for Angle {}
+
+impl Hash for Angle {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let bad_angle = (self.0 * 100000.0).round() as i32;
+        bad_angle.hash(state);
+    }
 }
 
 impl Generator {
@@ -65,6 +98,20 @@ impl Generator {
 
         // road tiles
         let mut bool_tiles = self.create_road_bool_tiles();
+        for x in 0..LEVEL_WIDTH as i32 {
+            for y in 0..LEVEL_HEIGHT as i32 {
+                let index = y * LEVEL_WIDTH as i32 + x;
+                let ix = x - LEVEL_WIDTH as i32 / 2;
+                let iy = y - LEVEL_HEIGHT as i32 / 2;
+                if !bool_tiles.contains_key(&ix) || !bool_tiles[&ix].contains_key(&iy) {
+                    continue;
+                }
+
+                if bool_tiles[&ix][&iy] {
+                    self.grass[index as usize] = false;
+                }
+            }
+        }
         for (x, map) in bool_tiles.into_iter() {
             for (y, gravel) in map.into_iter() {
                 self.draw_tile(x, y, if gravel {0xffffff} else {0x43711d}, 1.0);
@@ -92,7 +139,7 @@ impl Generator {
         // generate out the divider walls with random curves and metadata for the thickness along the path
         let mut t1_t3_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t1_t3_wall, desired_wall_length, t1_t3_angle, t1_t3_angle, 0.02, None);
+        self.fill_wall(&mut t1_t3_wall, 45000.0, t1_t3_angle, t1_t3_angle, 0.02, None);
         let [mut t1_t3_wall_1, mut t1_t3_wall_2] = t1_t3_wall.thicken(self, 200.0, 1200.0);
         t1_t3_wall.render(self, 0x880044);
         t1_t3_wall_1.render(self, 0x000044);
@@ -100,7 +147,7 @@ impl Generator {
 
         let mut t3_t2_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t3_t2_wall, desired_wall_length, t3_t2_angle, t3_t2_angle, 0.02, None);
+        self.fill_wall(&mut t3_t2_wall, 45000.0, t3_t2_angle, t3_t2_angle, 0.02, None);
         let [mut t3_t2_wall_1, mut t3_t2_wall_2] = t3_t2_wall.thicken(self, 200.0, 1200.0);
         t3_t2_wall.render(self, 0x880044);
         t3_t2_wall_1.render(self, 0x000044);
@@ -108,15 +155,19 @@ impl Generator {
 
         let mut t2_t1_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t2_t1_wall, desired_wall_length, t2_t1_angle, t2_t1_angle, 0.02, Some(&t1_t3_wall_1));
+        self.fill_wall(&mut t2_t1_wall, 45000.0, t2_t1_angle, t2_t1_angle, 0.02, Some(&t1_t3_wall_1));
         let [mut t2_t1_wall_1, mut t2_t1_wall_2] = t2_t1_wall.thicken(self, 200.0, 1200.0);
         t2_t1_wall.render(self, 0x880044);
         t2_t1_wall_1.render(self, 0x000044);
         t2_t1_wall_2.render(self, 0x000044);
 
-        let [mut t1_inner_wall, mut t1_wall_lower, mut t1_wall_upper] = self.fill_between_wall(&t2_t1_wall_2, &t1_t3_wall_1, 12000.0);
-        t1_wall_lower.render(self, 0x880044);
-        t1_wall_upper.render(self, 0x880044);
+        let [mut t1_wall_inner, mut t1_wall_lower, mut t1_wall_upper] = self.fill_between_wall(&t2_t1_wall_2, &t1_t3_wall_1, 12000.0);
+        t1_wall_inner.render(self, 0x880044);
+        t1_wall_lower.render(self, 0x000044);
+        t1_wall_upper.render(self, 0x000044);
+
+        // calculate the road segments at the exact edge of the safe zone
+        self.generate_roads(0.0, 0.0, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, 0xff0000, 0.8);
 
 
         // at the tip of each wall, extend the t3 t2 divider on both sides
@@ -126,6 +177,101 @@ impl Generator {
         // extend the t2 t1 divider towards t2
 
 
+    }
+
+    pub fn generate_roads(&mut self, center_x: f32, center_y: f32, width: f32, height: f32, color: u32, alpha: f32) {
+        let mut point_map = HashMap::new();
+
+        let max = width.max(height);
+        for angle in 0..200 {
+            let angle = (angle as f32 / 200.0) * PI * 2.0;
+
+            let point = [angle.cos() * max, angle.sin() * max];
+            let (point, distance) = MathHelper::distance_to_ellipse(center_x, center_y, width / 2.0, height / 2.0, &point);
+            let point = [
+                (point[0] / TEXTURE_WIDTH as f32) as i32,
+                (point[1] / TEXTURE_HEIGHT as f32) as i32,
+            ];
+
+            let angle = (point[1] as f32).atan2(point[0] as f32);
+            point_map.insert(Angle(angle), point);
+        }
+
+        let mut sorted_tiles: Vec<(Angle, [i32; 2])> = point_map.into_iter().collect();
+        sorted_tiles.sort_by(|first, second| {
+            return first.0.partial_cmp(&second.0).unwrap();
+        });
+
+        // find the first grass tile to start on, to ensure no roads are cut in half
+        let mut start_index = 0;
+        for (index, (angle, tile)) in sorted_tiles.iter().enumerate() {
+            if self.is_tile_grass(tile[0], tile[1]) {
+                start_index = index;
+                break;
+            }
+        }
+
+        let mut road_segments = Vec::new();
+        let mut start_road_segment: Option<usize> = None;
+        let mut end_road_segment: Option<usize> = None;
+        // less than or equal so it will do +1 allowing it to finish off the last road
+        for i in 0..=sorted_tiles.len() {
+            let index = (start_index + i) % sorted_tiles.len();
+            let (angle, tile) = sorted_tiles[index];
+
+            if !self.is_tile_grass(tile[0], tile[1]) {
+                if start_road_segment.is_none() {
+                    start_road_segment = Some(index);
+                }
+
+                end_road_segment = Some(index);
+            }
+            if self.is_tile_grass(tile[0], tile[1]) && start_road_segment.is_some() {
+                let (start_angle, start_tile) = sorted_tiles[start_road_segment.unwrap()];
+                let (end_angle, end_tile) = sorted_tiles[end_road_segment.unwrap()];
+
+                let start = [
+                    start_tile[0] as f32 * TEXTURE_WIDTH as f32,
+                    start_tile[1] as f32 * TEXTURE_HEIGHT as f32,
+                ];
+                let end = [
+                    end_tile[0] as f32 * TEXTURE_WIDTH as f32,
+                    end_tile[1] as f32 * TEXTURE_HEIGHT as f32,
+                ];
+                // let dx = end[0] - start[0];
+                // let dy = end[1] - start[1];
+                // let d = (dx * dx + dy * dy).sqrt();
+                // let dx = dx / d;
+                // let dy = dy / d;
+                // let start = [
+                //     start[0] - dx * TEXTURE_WIDTH as f32 / 2.0,
+                //     start[1] - dy * TEXTURE_HEIGHT as f32 / 2.0,
+                // ];
+                // let end = [
+                //     end[0] + dx * TEXTURE_WIDTH as f32 / 2.0,
+                //     end[1] + dy * TEXTURE_HEIGHT as f32 / 2.0,
+                // ];
+                let center = [
+                    (start[0] + end[0]) / 2.0,
+                    (start[1] + end[1]) / 2.0,
+                ];
+                let dx = end[0] - start[0];
+                let dy = end[1] - start[1];
+                let d = (dx * dx + dy * dy).sqrt();
+
+                // this is bad
+                let angle = start_angle.0 + MathHelper::radians_between_angles(start_angle.0, end_angle.0) / 2.0;
+
+                road_segments.push(RoadSegment::create(self, center, d, angle));
+
+                start_road_segment = None;
+                end_road_segment = None;
+            }
+        }
+
+        for road_segment in &road_segments {
+            road_segment.render(self);
+        }
     }
 
     fn fill_wall(&mut self, wall: &mut WallSection, length: f32, angle: f32, desired_angle: f32, desired_angle_strength: f32, distance_wall: Option<&WallSection>) {
@@ -281,34 +427,66 @@ impl Generator {
     fn create_road_bool_tiles(&mut self) -> HashMap<i32, HashMap<i32, bool>> {
         let mut tiles: HashMap<i32, HashMap<i32, bool>> = HashMap::new();
 
+        let width = (SAFE_ZONE_WIDTH / TEXTURE_WIDTH as f32) as i32;
+        let height = (SAFE_ZONE_HEIGHT / TEXTURE_HEIGHT as f32) as i32;
+
+        let center_x = 0;
+        let center_y = 0;
+
         let aabb = [
-            [-(LEVEL_WIDTH as i32) / 2, -(LEVEL_HEIGHT as i32) / 2],
-            [LEVEL_WIDTH as i32 / 2, LEVEL_HEIGHT as i32 / 2],
+            [-width / 2, -height / 2],
+            [width / 2, height / 2],
         ];
 
-        for x in aabb[0][0]..=aabb[1][0] {
+        for x in (-(LEVEL_WIDTH as i32) / 2)..(LEVEL_WIDTH as i32 / 2) {
             let tiles = tiles.entry(x).or_default();
 
-            for y in aabb[0][1]..=aabb[1][1] {
-                let position_x = (x * TEXTURE_WIDTH as i32 + TEXTURE_WIDTH as i32 / 2) as f32;
-                let position_y = (y * TEXTURE_HEIGHT as i32 + TEXTURE_HEIGHT as i32 / 2) as f32;
+            for y in (-(LEVEL_HEIGHT as i32) / 2)..(LEVEL_HEIGHT as i32 / 2) {
+                let inside_center = true;
+                let inside_center = inside_center && x >= aabb[0][0];
+                let inside_center = inside_center && x < aabb[1][0];
+                let inside_center = inside_center && y >= aabb[0][1];
+                let inside_center = inside_center && y < aabb[1][1];
 
-                let distance = position_x * position_x + position_y * position_y;
-                let scale = (2.0 as f32).max(10000000.0 / distance);
+                if inside_center {
+                    let dx = (x - center_x) as f32 / (width as f32 / 2.0);
+                    let dy = (y - center_y) as f32 / (height as f32 / 2.0);
+                    let d2 = dx * dx + dy * dy;
 
-                let noise1 = self.get_perlin_value(position_x, position_y, scale);
-                let noise2 = self.get_perlin_value(position_x + APPROX_WIDTH, position_y + APPROX_HEIGHT, scale);
-                if noise1.abs() < 0.05 || noise2.abs() < 0.05 {
-                    // gravel
-                    tiles.insert(y, true);
+                    if d2 <= 1.0 {
+                        let position_x = (x * TEXTURE_WIDTH as i32 + TEXTURE_WIDTH as i32 / 2) as f32;
+                        let position_y = (y * TEXTURE_HEIGHT as i32 + TEXTURE_HEIGHT as i32 / 2) as f32;
+
+                        let (is_road, road_strength) = self.sample_road(position_x, position_y);
+                        if is_road {
+                            // gravel
+                            tiles.insert(y, true);
+                        } else {
+                            // grass
+                            tiles.insert(y, false);
+                        }
+                    } else {
+                        tiles.insert(y, false);
+                    }
                 } else {
-                    // grass
                     tiles.insert(y, false);
                 }
             }
         }
 
         return tiles;
+    }
+
+    pub fn sample_road(&mut self, x: f32, y: f32) -> (bool, f32) {
+        let distance = x * x + y * y;
+        let scale = (2.0 as f32).max(10000000.0 / distance);
+        let noise1 = self.get_perlin_value(x, y, scale);
+        let noise2 = self.get_perlin_value(x + APPROX_WIDTH, x + APPROX_HEIGHT, scale);
+        if noise1.abs() < 0.05 || noise2.abs() < 0.05 {
+            return (true, noise1.abs().min(noise2.abs()));
+        }
+
+        return (false, noise1.abs().min(noise2.abs()));
     }
 
     pub fn draw_tile(&mut self, x: i32, y: i32, color: u32, alpha: f32) {
@@ -355,6 +533,14 @@ impl Generator {
         for (x, y) in Bresenham::new((x1 as i32, y1 as i32), (x2 as i32, y2 as i32)) {
             self.draw_tile(x, y, color, alpha);
         }
+    }
+
+    fn is_tile_grass(&self, x: i32, y: i32) -> bool {
+        if let Some(tile_index) = Generator::grid_index((x + LEVEL_WIDTH as i32 / 2) as u32, (y + LEVEL_HEIGHT as i32 / 2) as u32) {
+            return self.grass[tile_index];
+        }
+
+        return false;
     }
 
     fn draw_rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, alpha: f32) {
@@ -404,12 +590,12 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 3615028849;
+        // let seed: u32 = 2873571609;
         println!("SEED {:?}", seed);
-        // let seed = 784818861;
 
         return Generator {
             pixels: vec![0; (LEVEL_WIDTH * LEVEL_HEIGHT) as usize],
+            grass: vec![true; (LEVEL_WIDTH * LEVEL_HEIGHT) as usize],
             random: Random::create(seed as i64),
             noise: Perlin::default(),
             seed: seed as i64,
