@@ -21,7 +21,7 @@ pub const TEXTURE_WIDTH: u32 = 32 * 4;
 pub const TEXTURE_HEIGHT: u32 = 24 * 4;
 
 // this value forces the rendering to be sampled down to 1 / screen_scale
-const SCREEN_SCALE: u32 = 2;
+const SCREEN_SCALE: u32 = 1;
 
 const LEVEL_WIDTH: usize = SCREEN_WIDTH as usize / TILE_WIDTH as usize * SCREEN_SCALE as usize;
 const LEVEL_HEIGHT: usize = SCREEN_HEIGHT as usize / TILE_HEIGHT as usize * SCREEN_SCALE as usize;
@@ -153,7 +153,54 @@ impl Generator {
         self.fill_wall(&mut t2_t1_wall, 45000.0, t2_t1_angle, t2_t1_angle, 0.02, Some(&t1_t3_wall_1));
         let [mut t2_t1_wall_1, mut t2_t1_wall_2] = t2_t1_wall.thicken(self, 200.0, 1200.0);
 
-        let [mut t1_wall_inner, mut t1_wall_lower, mut t1_wall_upper] = self.fill_between_wall(&t2_t1_wall_2, &t1_t3_wall_1, 12000.0);
+        // TODO I should do this some better way than literally halving it
+        let point1 = t2_t1_wall_2.get_point_at_length(12000.0);
+        let point2 = t1_t3_wall_1.get_point_at_length(12000.0);
+        let dx = point2[0] - point1[0];
+        let dy = point2[1] - point1[1];
+        let d = (dx * dx + dy * dy).sqrt();
+        let center = [
+            (point1[0] + dx / 2.0),
+            (point1[1] + dy / 2.0),
+        ];
+        let dx = dx / d;
+        let dy = dy / d;
+        let t1_wall_lower_start = [center[0] - dx * 200.0, center[1] - dy * 200.0];
+        let t1_wall_upper_start = [center[0] + dx * 200.0, center[1] + dy * 200.0];
+
+        let point1 = t2_t1_wall_2.get_last_point();
+        let point2 = t1_t3_wall_1.get_last_point();
+        let dx = point2[0] - point1[0];
+        let dy = point2[1] - point1[1];
+        let d = (dx * dx + dy * dy).sqrt();
+        let center = [
+            (point1[0] + dx / 2.0),
+            (point1[1] + dy / 2.0),
+        ];
+        let dx = dx / d;
+        let dy = dy / d;
+        let t1_wall_lower_end = [center[0] - dx * 900.0, center[1] - dy * 900.0];
+        let t1_wall_upper_end = [center[0] + dx * 900.0, center[1] + dy * 900.0];
+
+        let mut t1_wall_lower = WallSection::default();
+        t1_wall_lower.connect_points_linear(self, t1_wall_lower_start, t1_wall_lower_end);
+        t1_wall_lower.noiseify(self, 6000.0, 12.0, [0.0, 0.0], PI / 2.0);
+
+        let mut t1_wall_upper = WallSection::default();
+        t1_wall_upper.connect_points_linear(self, t1_wall_upper_start, t1_wall_upper_end);
+        t1_wall_upper.noiseify(self, 6000.0, 12.0, [0.0, 0.0], PI / 2.0);
+
+        let mut t1_wall_closing = WallSection::default();
+        let lower = t1_wall_lower.get_first_point();
+        let lower_angle = lower[1].atan2(lower[0]);
+        let upper = t1_wall_upper.get_first_point();
+        let upper_angle = upper[1].atan2(upper[0]);
+        t1_wall_closing.connect_points(
+            self,
+            lower,
+            [-lower_angle.cos() * 1000.0, -lower_angle.sin() * 1000.0],
+            upper,
+            [-upper_angle.cos() * 1000.0, -upper_angle.sin() * 1000.0]);
 
         // calculate the road segments at the exact edge of the safe zone
         self.generate_roads(0.0, 0.0, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, 0xff0000, 0.8);
@@ -182,7 +229,7 @@ impl Generator {
         let center_dist = (center_point[0] * center_point[0] + center_point[1] * center_point[1]).sqrt();
         center_point[0] -= center_point[0] / center_dist * 10000.0;
         center_point[1] -= center_point[1] / center_dist * 10000.0;
-        t1_upper_back_wall.noiseify(self, 400.0, 1.0, center_point);
+        t1_upper_back_wall.noiseify(self, 400.0, 1.0, center_point, 0.0);
 
         // t1 lower bounding wall
         let t1_lower_point = t1_wall_lower.get_last_point();
@@ -205,7 +252,7 @@ impl Generator {
         let center_dist = (center_point[0] * center_point[0] + center_point[1] * center_point[1]).sqrt();
         center_point[0] -= center_point[0] / center_dist * 10000.0;
         center_point[1] -= center_point[1] / center_dist * 10000.0;
-        t1_lower_back_wall.noiseify(self, 400.0, 1.0, center_point);
+        t1_lower_back_wall.noiseify(self, 400.0, 1.0, center_point, 0.0);
 
         let tangent_strength = 54000.0;
 
@@ -229,7 +276,7 @@ impl Generator {
         let center_dist = (center_point[0] * center_point[0] + center_point[1] * center_point[1]).sqrt();
         center_point[0] -= center_point[0] / center_dist * 10000.0;
         center_point[1] -= center_point[1] / center_dist * 10000.0;
-        t2_back_wall.noiseify(self, 400.0, 1.0, center_point);
+        t2_back_wall.noiseify(self, 400.0, 1.0, center_point, 0.0);
 
         // t3 back wall
         let length = 24000.0;
@@ -289,8 +336,8 @@ impl Generator {
             [t3_t2_angle.cos() * tangent_strength, t3_t2_angle.sin() * tangent_strength]);
         t3_back_wall.join_wall(t3_t2_side_wall);
 
-        t3_back_wall.noiseify(self, 8000.0, 20.0, [0.0, 0.0]);
-        t3_back_wall.noiseify(self, 400.0, 1.0, [0.0, 0.0]);
+        t3_back_wall.noiseify(self, 8000.0, 20.0, [0.0, 0.0], 0.0);
+        t3_back_wall.noiseify(self, 400.0, 1.0, [0.0, 0.0], 0.0);
 
         // self.draw_line(start_point[0], start_point[1], end_point[0], end_point[1], 0xff0000, 1.0);
 
@@ -316,8 +363,8 @@ impl Generator {
         t2_back_wall.render(self, 0x440088);
 
         t3_back_wall.render(self, 0x440088);
-        // t1_t3_side_wall.render(self, 0x004488);
-        // t3_t2_side_wall.render(self, 0x004488);
+
+        t1_wall_closing.render(self, 0x440088);
     }
 
     pub fn generate_roads(&mut self, center_x: f32, center_y: f32, width: f32, height: f32, color: u32, alpha: f32) {

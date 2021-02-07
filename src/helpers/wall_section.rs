@@ -108,7 +108,7 @@ impl WallSection {
         // }
     }
 
-    pub fn noiseify(&mut self, generator: &mut Generator, strength: f32, scale: f32, center: [f32; 2]) {
+    pub fn noiseify(&mut self, generator: &mut Generator, strength: f32, scale: f32, center: [f32; 2], offset_angle: f32) {
         for i in 1..(self.lines.len() - 1) {
             let progress = i as f32 / (self.lines.len() - 1) as f32;
             let ease = MathHelper::ease_in_out((progress * 2.0).min(1.0));
@@ -117,12 +117,10 @@ impl WallSection {
             let point = &mut self.lines[i];
 
             let perlin = generator.get_perlin_value(point[0] + 56342.0, point[1] + 90678.0, scale);
-            let dx = point[0] - center[0];
-            let dy = point[1] - center[1];
-            let d = (dx * dx + dy * dy).sqrt();
-
-            let dx = dx / d;
-            let dy = dy / d;
+            let angle = (point[1] - center[1]).atan2(point[0] - center[0]);
+            let angle = angle + offset_angle;
+            let dx = angle.cos();
+            let dy = angle.sin();
 
             point[0] += dx * perlin * strength * ease;
             point[1] += dy * perlin * strength * ease;
@@ -142,6 +140,10 @@ impl WallSection {
         } else {
             panic!("Can not join walls that don't share a vertex.");
         }
+    }
+
+    pub fn get_first_point(&self) -> [f32; 2] {
+        return self.lines[0];
     }
 
     pub fn get_last_point(&self) -> [f32; 2] {
