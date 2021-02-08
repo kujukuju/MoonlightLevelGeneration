@@ -140,17 +140,17 @@ impl Generator {
         // generate out the divider walls with random curves and metadata for the thickness along the path
         let mut t1_t3_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t1_t3_wall, 45000.0, t1_t3_angle, t1_t3_angle, 0.02, None);
+        self.fill_wall(&mut t1_t3_wall, 45000.0, t1_t3_angle, t1_t3_angle, 0.08, None);
         let [mut t1_t3_wall_1, mut t1_t3_wall_2] = t1_t3_wall.thicken(self, 200.0, 1200.0);
 
         let mut t3_t2_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t3_t2_wall, 45000.0, t3_t2_angle, t3_t2_angle, 0.02, None);
+        self.fill_wall(&mut t3_t2_wall, 45000.0, t3_t2_angle, t3_t2_angle, 0.08, None);
         let [mut t3_t2_wall_1, mut t3_t2_wall_2] = t3_t2_wall.thicken(self, 200.0, 1200.0);
 
         let mut t2_t1_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t2_t1_wall, 45000.0, t2_t1_angle, t2_t1_angle, 0.02, Some(&t1_t3_wall_1));
+        self.fill_wall(&mut t2_t1_wall, 45000.0, t2_t1_angle, t2_t1_angle, 0.08, Some(&t1_t3_wall_1));
         let [mut t2_t1_wall_1, mut t2_t1_wall_2] = t2_t1_wall.thicken(self, 200.0, 1200.0);
 
         // TODO I should do this some better way than literally halving it
@@ -841,7 +841,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 2634709908;
+        // let seed: u32 = 665519500;
 
         // TODO cursed seed to try before finalizing
         // let seed: u32 = 1835892476;
