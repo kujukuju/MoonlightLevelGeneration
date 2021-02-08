@@ -128,7 +128,13 @@ impl WallSection {
     }
 
     pub fn join_wall(&mut self, mut wall: WallSection) {
-        if self.lines[0][0] == wall.lines[wall.lines.len() - 1][0] && self.lines[0][1] == wall.lines[wall.lines.len() - 1][1] {
+        // println!("test {:?} {:?} {:?} {:?}", self.lines[0], self.lines[self.lines.len() - 1], wall.lines[0], wall.lines[wall.lines.len() - 1]);
+        if self.lines[self.lines.len() - 1][0] == wall.lines[wall.lines.len() - 1][0] && self.lines[self.lines.len() - 1][1] == wall.lines[wall.lines.len() - 1][1] {
+            for vertex in wall.lines.drain(0..(wall.lines.len() - 1)).rev() {
+                self.lines.push(vertex);
+            }
+        } else if self.lines[0][0] == wall.lines[wall.lines.len() - 1][0] && self.lines[0][1] == wall.lines[wall.lines.len() - 1][1] {
+            // incorrect and slow
             for vertex in self.lines.drain(1..) {
                 wall.lines.push(vertex);
             }

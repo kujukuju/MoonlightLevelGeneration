@@ -21,7 +21,7 @@ pub const TEXTURE_WIDTH: u32 = 32 * 4;
 pub const TEXTURE_HEIGHT: u32 = 24 * 4;
 
 // this value forces the rendering to be sampled down to 1 / screen_scale
-const SCREEN_SCALE: u32 = 1;
+const SCREEN_SCALE: u32 = 2;
 
 const LEVEL_WIDTH: usize = SCREEN_WIDTH as usize / TILE_WIDTH as usize * SCREEN_SCALE as usize;
 const LEVEL_HEIGHT: usize = SCREEN_HEIGHT as usize / TILE_HEIGHT as usize * SCREEN_SCALE as usize;
@@ -190,17 +190,16 @@ impl Generator {
         t1_wall_upper.connect_points_linear(self, t1_wall_upper_start, t1_wall_upper_end);
         t1_wall_upper.noiseify(self, 6000.0, 12.0, [0.0, 0.0], PI / 2.0);
 
-        let mut t1_wall_closing = WallSection::default();
-        let lower = t1_wall_lower.get_first_point();
-        let lower_angle = lower[1].atan2(lower[0]);
-        let upper = t1_wall_upper.get_first_point();
-        let upper_angle = upper[1].atan2(upper[0]);
-        t1_wall_closing.connect_points(
-            self,
-            lower,
-            [-lower_angle.cos() * 1000.0, -lower_angle.sin() * 1000.0],
-            upper,
-            [-upper_angle.cos() * 1000.0, -upper_angle.sin() * 1000.0]);
+        // t1 inner closing wall
+        let mut t1_wall_closing = self.close_walls(&t1_wall_lower, &t1_wall_upper);
+
+        // t1 t3 closing wall
+        let mut t1_t3_wall_closing = self.close_walls(&t1_t3_wall_1, &t1_t3_wall_2);
+
+        // t3 t2 closing wall
+        let mut t3_t2_wall_closing = self.close_walls(&t3_t2_wall_1, &t3_t2_wall_2);
+
+        let mut t2_t1_wall_closing = self.close_walls(&t2_t1_wall_1, &t2_t1_wall_2);
 
         // calculate the road segments at the exact edge of the safe zone
         self.generate_roads(0.0, 0.0, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, 0xff0000, 0.8);
@@ -341,30 +340,66 @@ impl Generator {
 
         // self.draw_line(start_point[0], start_point[1], end_point[0], end_point[1], 0xff0000, 1.0);
 
+        t1_t3_wall_2.join_wall(t3_back_wall);
+        t1_t3_wall_2.join_wall(t3_t2_wall_1);
+        t1_t3_wall_2.join_wall(t3_t2_wall_closing);
+        t1_t3_wall_2.join_wall(t3_t2_wall_2);
+        t1_t3_wall_2.join_wall(t2_back_wall);
+        t1_t3_wall_2.join_wall(t2_t1_wall_1);
+        t1_t3_wall_2.join_wall(t2_t1_wall_closing);
+        t1_t3_wall_2.join_wall(t2_t1_wall_2);
+        t1_t3_wall_2.join_wall(t1_lower_back_wall);
+        t1_t3_wall_2.join_wall(t1_wall_lower);
+        t1_t3_wall_2.join_wall(t1_wall_closing);
+        t1_t3_wall_2.join_wall(t1_wall_upper);
+        t1_t3_wall_2.join_wall(t1_upper_back_wall);
+        t1_t3_wall_2.join_wall(t1_t3_wall_1);
+        t1_t3_wall_2.join_wall(t1_t3_wall_closing);
+
+        t1_t3_wall_2.render(self, 0x440088);
+
         // t1_t3_wall.render(self, 0x880044);
-        t1_t3_wall_1.render(self, 0x000044);
-        t1_t3_wall_2.render(self, 0x000044);
+        // t1_t3_wall_1.render(self, 0x000044);
+        // t1_t3_wall_2.render(self, 0x000044);
+        //
+        // // t3_t2_wall.render(self, 0x880044);
+        // t3_t2_wall_1.render(self, 0x000044);
+        // t3_t2_wall_2.render(self, 0x000044);
+        //
+        // // t2_t1_wall.render(self, 0x880044);
+        // t2_t1_wall_1.render(self, 0x000044);
+        // t2_t1_wall_2.render(self, 0x000044);
+        //
+        // // t1_wall_inner.render(self, 0x880044);
+        // t1_wall_lower.render(self, 0x000044);
+        // t1_wall_upper.render(self, 0x000044);
+        //
+        // t1_upper_back_wall.render(self, 0x440088);
+        // t1_lower_back_wall.render(self, 0x440088);
+        //
+        // t2_back_wall.render(self, 0x440088);
+        // t3_back_wall.render(self, 0x440088);
+        //
+        // t1_wall_closing.render(self, 0x440088);
+        // t1_t3_wall_closing.render(self, 0x440088);
+        // t3_t2_wall_closing.render(self, 0x440088);
+        // t2_t1_wall_closing.render(self, 0x440088);
+    }
 
-        // t3_t2_wall.render(self, 0x880044);
-        t3_t2_wall_1.render(self, 0x000044);
-        t3_t2_wall_2.render(self, 0x000044);
+    pub fn close_walls(&mut self, lower: &WallSection, upper: &WallSection) -> WallSection {
+        let mut wall_closing = WallSection::default();
+        let lower_point = lower.get_first_point();
+        let lower_angle = lower_point[1].atan2(lower_point[0]);
+        let upper_point = upper.get_first_point();
+        let upper_angle = upper_point[1].atan2(upper_point[0]);
+        wall_closing.connect_points(
+            self,
+            lower_point,
+            [-lower_angle.cos() * 2000.0, -lower_angle.sin() * 2000.0],
+            upper_point,
+            [-upper_angle.cos() * 2000.0, -upper_angle.sin() * 2000.0]);
 
-        // t2_t1_wall.render(self, 0x880044);
-        t2_t1_wall_1.render(self, 0x000044);
-        t2_t1_wall_2.render(self, 0x000044);
-
-        // t1_wall_inner.render(self, 0x880044);
-        t1_wall_lower.render(self, 0x000044);
-        t1_wall_upper.render(self, 0x000044);
-
-        t1_upper_back_wall.render(self, 0x440088);
-        t1_lower_back_wall.render(self, 0x440088);
-
-        t2_back_wall.render(self, 0x440088);
-
-        t3_back_wall.render(self, 0x440088);
-
-        t1_wall_closing.render(self, 0x440088);
+        return wall_closing;
     }
 
     pub fn generate_roads(&mut self, center_x: f32, center_y: f32, width: f32, height: f32, color: u32, alpha: f32) {
