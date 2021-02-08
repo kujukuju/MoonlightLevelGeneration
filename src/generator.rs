@@ -324,7 +324,9 @@ impl Generator {
             [t1_t3_angle.cos() * tangent_strength, t1_t3_angle.sin() * tangent_strength],
             start_point,
             [-back_wall_angle.cos() * tangent_strength, -back_wall_angle.sin() * tangent_strength]);
-        t3_back_wall.join_wall(t1_t3_side_wall);
+        t1_t3_side_wall.join_wall(t3_back_wall);
+        let mut t3_back_wall = t1_t3_side_wall;
+        // t3_back_wall.join_wall(t1_t3_side_wall);
 
         let mut t3_t2_side_wall = WallSection::default();
         t3_t2_side_wall.connect_points(
