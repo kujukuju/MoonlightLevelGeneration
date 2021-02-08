@@ -10,6 +10,8 @@ pub struct Point {
 
 pub struct RoadSegment {
     start_point: [f32; 2],
+    start_angle: f32,
+    end_angle: f32,
     thickness: f32,
     angle: f32,
     points: Vec<Point>
@@ -66,10 +68,10 @@ impl RoadSegment {
             self.points.push(Point {
                 x: point[0],
                 y: point[1],
-                thickness: thickness,
+                thickness,
             });
 
-            split_chance += (thickness - 180.0).max(0.0) / 2100.0 * generator.next();
+            split_chance += (thickness.sqrt() - 12.0).max(0.0) / 60.0 * generator.next();
             let split = split_chance > 1.0;
             if split {
                 let point1 = [
@@ -81,8 +83,12 @@ impl RoadSegment {
                     point[1] + (angle + PI / 2.0).sin() * thickness / 4.0,
                 ];
 
-                let mut segment1 = RoadSegment::create(generator, point1, thickness / 2.0, angle);
-                let mut segment2 = RoadSegment::create(generator, point2, thickness / 2.0, angle);
+                let angle_diff = MathHelper::radians_between_angles(self.start_angle, self.end_angle);
+
+                let mut segment1 = RoadSegment::create(generator, point1, angle - angle_diff / 2.0, angle, thickness / 2.0);
+                let mut segment2 = RoadSegment::create(generator, point2, angle, angle + angle_diff / 2.0, thickness / 2.0);
+                // let mut segment1 = RoadSegment::create(generator, point1, self.start_angle, self.end_angle, thickness / 1.5);
+                // let mut segment2 = RoadSegment::create(generator, point2, self.start_angle, self.end_angle, thickness / 1.5);
 
                 let children1 = segment1.extend(generator, length - distance);
                 return_segments.push(segment1);
@@ -121,8 +127,11 @@ impl RoadSegment {
 }
 
 impl RoadSegment {
-    pub fn create(generator: &mut Generator, point: [f32; 2], thickness: f32, angle: f32) -> Self {
+    pub fn create(generator: &mut Generator, point: [f32; 2], start_angle: f32, end_angle: f32, thickness: f32) -> Self {
         let (edge_point, distance) = MathHelper::distance_to_ellipse(0.0, 0.0, SAFE_ZONE_WIDTH / 2.0, SAFE_ZONE_HEIGHT / 2.0, &point);
+
+        let angle_diff = MathHelper::radians_between_angles(start_angle, end_angle);
+        let angle = start_angle + angle_diff / 2.0;
 
         // smaller number?
         let mut vector = [0.0, 0.0];
@@ -166,15 +175,24 @@ impl RoadSegment {
 
         vector[0] /= vector_count as f32;
         vector[1] /= vector_count as f32;
-        let road_angle;
+        let mut road_angle;
         if vector_count > 0 {
             road_angle = vector[1].atan2(vector[0]);
         } else {
             road_angle = angle;
         }
 
+        let angle_diff = MathHelper::radians_between_angles(road_angle, angle);
+        if angle_diff.abs() > 45.0 / 180.0 * PI {
+            road_angle += angle_diff.signum() * 45.0 / 180.0 * PI;
+        }
+
+        let angle_diff = MathHelper::radians_between_angles(start_angle, end_angle);
+
         return RoadSegment {
             start_point: point,
+            start_angle: road_angle - angle_diff / 2.0,
+            end_angle: road_angle + angle_diff / 2.0,
             thickness,
             angle: road_angle,
             points: Vec::new(),

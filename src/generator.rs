@@ -485,9 +485,8 @@ impl Generator {
                 let d = (dx * dx + dy * dy).sqrt();
 
                 // this is bad
-                let angle = start_angle.0 + MathHelper::radians_between_angles(start_angle.0, end_angle.0) / 2.0;
 
-                road_segments.push(RoadSegment::create(self, center, d, angle));
+                road_segments.push(RoadSegment::create(self, center, start_angle.0, end_angle.0, d));
 
                 start_road_segment = None;
                 end_road_segment = None;
@@ -842,7 +841,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 136914854;
+        // let seed: u32 = 2634709908;
 
         // TODO cursed seed to try before finalizing
         // let seed: u32 = 1835892476;
