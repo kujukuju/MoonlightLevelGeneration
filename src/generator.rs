@@ -537,7 +537,7 @@ impl Generator {
         t3_t2_inner.round_to_angle(PI / 8.0);
         t3_t2_inner.remove_loops();
         outer_wall.round_to_angle(PI / 8.0);
-        outer_wall.remove_loops();
+        // outer_wall.remove_loops();
 
         t1_inner_1.render(self, 0x000000);
         t1_inner_2.render(self, 0x000000);
@@ -950,7 +950,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 2996010972;
+        let seed: u32 = 424276968;
 
         // TODO cursed seed to try before finalizing
         // let seed: u32 = 1835892476;
