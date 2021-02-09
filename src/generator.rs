@@ -699,7 +699,7 @@ impl Generator {
         for road_segment in &mut road_segments {
             let children = road_segment.extend(self, 40000.0);
             road_segment.render(self);
-            for child in children {s
+            for child in children {
                 child.render(self);
             }
         }
