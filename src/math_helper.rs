@@ -25,6 +25,53 @@ impl MathHelper {
         return (angle / interval).round() * interval;
     }
 
+    pub fn intersect_ray_ray(start1: [f32; 2], direction1: [f32; 2], start2: [f32; 2], direction2: [f32; 2]) -> Option<[f32; 2]> {
+        let difx = start2[0] - start1[0];
+        let dify = start2[1] - start1[1];
+        let d1xd2 = direction1[0] * direction2[1] - direction1[1] * direction2[0];
+        if d1xd2 == 0.0 {
+            return None;
+        }
+        let d2sx = direction2[0] / d1xd2;
+        let d2sy = direction2[1] / d1xd2;
+        let length = difx * d2sy - dify * d2sx;
+
+        return Some([
+            start1[0] + direction1[0] * length,
+            start1[1] + direction1[1] * length,
+        ]);
+    }
+
+    pub fn intersect_line_line(line1: [[f32; 2]; 2], line2: [[f32; 2]; 2]) -> Option<[f32; 2]> {
+        let x1 = line1[0][0];
+        let y1 = line1[0][1];
+        let x2 = line1[1][0];
+        let y2 = line1[1][1];
+        let x3 = line2[0][0];
+        let y3 = line2[0][1];
+        let x4 = line2[1][0];
+        let y4 = line2[1][1];
+
+        let d = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+        if d == 0.0 {
+            return None;
+        }
+
+        let yd = y1 - y3;
+        let xd = x1 - x3;
+        let ua = ((x4 - x3) * yd - (y4 - y3) * xd) / d;
+        if ua < 0.0 || ua > 1.0 {
+            return None;
+        }
+
+        let ub = ((x2 - x1) * yd - (y2 - y1) * xd) / d;
+        if ub < 0.0 || ub > 1.0 {
+            return None;
+        }
+
+        return Some([x1 + (x2 - x1) * ua, y1 + (y2 - y1) * ua]);
+    }
+
     pub fn distance_to_line_segment(line: &[[f32; 2]; 2], point: &[f32; 2]) -> ([f32; 2], f32) {
         let line_dx = line[1][0] - line[0][0];
         let line_dy = line[1][1] - line[0][1];

@@ -71,7 +71,7 @@ impl RoadSegment {
                 thickness,
             });
 
-            split_chance += (thickness.sqrt() - 12.0).max(0.0) / 60.0 * generator.next();
+            split_chance += (thickness.sqrt() - 12.0).max(0.0) / 18.0 * generator.next();
             let split = split_chance > 1.0;
             if split {
                 let point1 = [
@@ -85,8 +85,8 @@ impl RoadSegment {
 
                 let angle_diff = MathHelper::radians_between_angles(self.start_angle, self.end_angle);
 
-                let mut segment1 = RoadSegment::create(generator, point1, angle - angle_diff / 2.0, angle, thickness / 2.0);
-                let mut segment2 = RoadSegment::create(generator, point2, angle, angle + angle_diff / 2.0, thickness / 2.0);
+                let mut segment1 = RoadSegment::create(generator, point1, angle - angle_diff * (0.6 + generator.next() * 0.5), angle, thickness / 1.2);
+                let mut segment2 = RoadSegment::create(generator, point2, angle, angle + angle_diff * (0.6 + generator.next() * 0.5), thickness / 1.2);
                 // let mut segment1 = RoadSegment::create(generator, point1, self.start_angle, self.end_angle, thickness / 1.5);
                 // let mut segment2 = RoadSegment::create(generator, point2, self.start_angle, self.end_angle, thickness / 1.5);
 
@@ -102,7 +102,37 @@ impl RoadSegment {
                 }
 
                 break;
-            }
+            }/* else if 20.0 / thickness.sqrt() < generator.next() {
+                // chance to split with no thickness cut
+                let point1 = [
+                    point[0] - (angle + PI / 2.0).cos() * thickness / 2.0,
+                    point[1] - (angle + PI / 2.0).sin() * thickness / 2.0,
+                ];
+                let point2 = [
+                    point[0] + (angle + PI / 2.0).cos() * thickness / 2.0,
+                    point[1] + (angle + PI / 2.0).sin() * thickness / 2.0,
+                ];
+
+                let angle_diff = MathHelper::radians_between_angles(self.start_angle, self.end_angle);
+
+                let mut segment1 = RoadSegment::create(generator, point1, angle - angle_diff / 2.0, angle, thickness);
+                let mut segment2 = RoadSegment::create(generator, point2, angle, angle + angle_diff / 2.0, thickness);
+                // let mut segment1 = RoadSegment::create(generator, point1, self.start_angle, self.end_angle, thickness / 1.5);
+                // let mut segment2 = RoadSegment::create(generator, point2, self.start_angle, self.end_angle, thickness / 1.5);
+
+                let children1 = segment1.extend(generator, length - distance);
+                return_segments.push(segment1);
+                for segment in children1 {
+                    return_segments.push(segment);
+                }
+                let children2 = segment2.extend(generator, length - distance);
+                return_segments.push(segment2);
+                for segment in children2 {
+                    return_segments.push(segment);
+                }
+
+                break;
+            }*/
 
             // same logic as walls so they kind of bend the same way
             let angle_mod = generator.get_perlin_value(point[0] - 10240.0, point[1] - 10240.0, 1.0);

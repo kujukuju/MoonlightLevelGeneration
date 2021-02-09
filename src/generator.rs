@@ -140,17 +140,17 @@ impl Generator {
         // generate out the divider walls with random curves and metadata for the thickness along the path
         let mut t1_t3_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t1_t3_wall, 45000.0, t1_t3_angle, t1_t3_angle, 0.08, None);
+        t1_t3_wall.fill_wall(self, 45000.0, t1_t3_angle, t1_t3_angle, 0.08, None);
         let [mut t1_t3_wall_1, mut t1_t3_wall_2] = t1_t3_wall.thicken(self, 200.0, 1200.0);
 
         let mut t3_t2_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t3_t2_wall, 45000.0, t3_t2_angle, t3_t2_angle, 0.08, None);
+        t3_t2_wall.fill_wall(self, 45000.0, t3_t2_angle, t3_t2_angle, 0.08, None);
         let [mut t3_t2_wall_1, mut t3_t2_wall_2] = t3_t2_wall.thicken(self, 200.0, 1200.0);
 
         let mut t2_t1_wall = WallSection::default();
         let desired_wall_length = 30000.0 + 12000.0 * self.next();
-        self.fill_wall(&mut t2_t1_wall, 45000.0, t2_t1_angle, t2_t1_angle, 0.08, Some(&t1_t3_wall_1));
+        t2_t1_wall.fill_wall(self, 45000.0, t2_t1_angle, t2_t1_angle, 0.08, Some(&t1_t3_wall_1));
         let [mut t2_t1_wall_1, mut t2_t1_wall_2] = t2_t1_wall.thicken(self, 200.0, 1200.0);
 
         // TODO I should do this some better way than literally halving it
@@ -342,39 +342,242 @@ impl Generator {
 
         // self.draw_line(start_point[0], start_point[1], end_point[0], end_point[1], 0xff0000, 1.0);
 
+        // t2 t1 connector
+        let t2_t1_wall_1_length = t2_t1_wall_1.get_length();
+        let t2_t1_wall_2_length = t2_t1_wall_2.get_length();
+        let t2_t1_path_length = t2_t1_wall_1_length.min(t2_t1_wall_2_length) * (0.6 + self.next() * 0.3);
+
+        let t2_t1_path_thickness = 900.0 + 1400.0 * self.next();
+        let [mut t2_t1_wall_1_split_1, mut t2_t1_wall_1_split_2] = t2_t1_wall_1.split_for_path(t2_t1_path_length, t2_t1_path_thickness);
+
+        let [mut t2_t1_wall_2_split_1, mut t2_t1_wall_2_split_2] = t2_t1_wall_2.split_for_path(t2_t1_path_length, t2_t1_path_thickness);
+
+        let mut t2_t1_path_wall_1 = WallSection::default();
+        let point1 = t2_t1_wall_1_split_1.get_last_point();
+        let tangent1 = [
+            point1[1].atan2(point1[0]).cos() * 1000.0,
+            point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t2_t1_wall_2_split_1.get_last_point();
+        let tangent2 = [
+            point2[1].atan2(point2[0]).cos() * 1000.0,
+            point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t2_t1_path_wall_1.connect_points(self, point1, tangent1, point2, tangent2);
+
+        let mut t2_t1_path_wall_2 = WallSection::default();
+        let point1 = t2_t1_wall_1_split_2.get_first_point();
+        let tangent1 = [
+            -point1[1].atan2(point1[0]).cos() * 1000.0,
+            -point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t2_t1_wall_2_split_2.get_first_point();
+        let tangent2 = [
+            -point2[1].atan2(point2[0]).cos() * 1000.0,
+            -point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t2_t1_path_wall_2.connect_points(self, point1, tangent1, point2, tangent2);
+
+        t2_t1_wall_1_split_1.join_wall(t2_t1_path_wall_1);
+        t2_t1_wall_1_split_1.join_wall(t2_t1_wall_2_split_1);
+        t2_t1_wall_1_split_1.join_wall(t2_t1_wall_closing);
+
+        let mut t2_t1_inner = t2_t1_wall_1_split_1;
+
+        // t3 t2 connector
+        let t3_t2_wall_1_length = t3_t2_wall_1.get_length();
+        let t3_t2_wall_2_length = t3_t2_wall_2.get_length();
+        let t3_t2_path_length = t3_t2_wall_1_length.min(t3_t2_wall_2_length) * (0.6 + self.next() * 0.3);
+
+        let t3_t2_path_thickness = 900.0 + 1400.0 * self.next();
+        let [mut t3_t2_wall_1_split_1, mut t3_t2_wall_1_split_2] = t3_t2_wall_1.split_for_path(t3_t2_path_length, t3_t2_path_thickness);
+
+        let [mut t3_t2_wall_2_split_1, mut t3_t2_wall_2_split_2] = t3_t2_wall_2.split_for_path(t3_t2_path_length, t3_t2_path_thickness);
+
+        let mut t3_t2_path_wall_1 = WallSection::default();
+        let point1 = t3_t2_wall_1_split_1.get_last_point();
+        let tangent1 = [
+            point1[1].atan2(point1[0]).cos() * 1000.0,
+            point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t3_t2_wall_2_split_1.get_last_point();
+        let tangent2 = [
+            point2[1].atan2(point2[0]).cos() * 1000.0,
+            point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t3_t2_path_wall_1.connect_points(self, point1, tangent1, point2, tangent2);
+
+        let mut t3_t2_path_wall_2 = WallSection::default();
+        let point1 = t3_t2_wall_1_split_2.get_first_point();
+        let tangent1 = [
+            -point1[1].atan2(point1[0]).cos() * 1000.0,
+            -point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t3_t2_wall_2_split_2.get_first_point();
+        let tangent2 = [
+            -point2[1].atan2(point2[0]).cos() * 1000.0,
+            -point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t3_t2_path_wall_2.connect_points(self, point1, tangent1, point2, tangent2);
+
+        t3_t2_wall_1_split_1.join_wall(t3_t2_path_wall_1);
+        t3_t2_wall_1_split_1.join_wall(t3_t2_wall_2_split_1);
+        t3_t2_wall_1_split_1.join_wall(t3_t2_wall_closing);
+
+        let mut t3_t2_inner = t3_t2_wall_1_split_1;
+
+        // t1 first connector
+        let t1_wall_lower_length = t1_wall_lower.get_length();
+        let t1_wall_upper_length = t1_wall_upper.get_length();
+        let t1_path_length = t1_wall_lower_length.min(t1_wall_upper_length) * (0.25 + self.next() * 0.25);
+
+        let t1_path_thickness = 900.0 + 1400.0 * self.next();
+        let [mut t1_wall_lower_split_1, mut t1_wall_lower_split_2] = t1_wall_lower.split_for_path(t1_path_length, t1_path_thickness);
+
+        let [mut t1_wall_upper_split_1, mut t1_wall_upper_split_2] = t1_wall_upper.split_for_path(t1_path_length, t1_path_thickness);
+
+        let mut t1_path_wall_1 = WallSection::default();
+        let point1 = t1_wall_lower_split_1.get_last_point();
+        let tangent1 = [
+            point1[1].atan2(point1[0]).cos() * 1000.0,
+            point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t1_wall_upper_split_1.get_last_point();
+        let tangent2 = [
+            point2[1].atan2(point2[0]).cos() * 1000.0,
+            point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t1_path_wall_1.connect_points(self, point1, tangent1, point2, tangent2);
+
+        let mut t1_path_wall_2 = WallSection::default();
+        let point1 = t1_wall_lower_split_2.get_first_point();
+        let tangent1 = [
+            -point1[1].atan2(point1[0]).cos() * 1000.0,
+            -point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t1_wall_upper_split_2.get_first_point();
+        let tangent2 = [
+            -point2[1].atan2(point2[0]).cos() * 1000.0,
+            -point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t1_path_wall_2.connect_points(self, point1, tangent1, point2, tangent2);
+
+        t1_wall_lower_split_1.join_wall(t1_path_wall_1);
+        t1_wall_lower_split_1.join_wall(t1_wall_upper_split_1);
+        t1_wall_lower_split_1.join_wall(t1_wall_closing);
+
+        let mut t1_inner_1 = t1_wall_lower_split_1;
+
+        // t1 second connector
+        let t1_wall_lower_length = t1_wall_lower_split_2.get_length();
+        let t1_wall_upper_length = t1_wall_upper_split_2.get_length();
+        let t1_path_length = t1_wall_lower_length.min(t1_wall_upper_length) * (0.50 + self.next() * 0.40);
+
+        let t1_path_thickness = 900.0 + 1400.0 * self.next();
+        let [mut t1_wall_lower_split_2, mut t1_wall_lower_split_3] = t1_wall_lower_split_2.split_for_path(t1_path_length, t1_path_thickness);
+
+        let [mut t1_wall_upper_split_2, mut t1_wall_upper_split_3] = t1_wall_upper_split_2.split_for_path(t1_path_length, t1_path_thickness);
+
+        let mut t1_path_wall_3 = WallSection::default();
+        let point1 = t1_wall_lower_split_2.get_last_point();
+        let tangent1 = [
+            point1[1].atan2(point1[0]).cos() * 1000.0,
+            point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t1_wall_upper_split_2.get_last_point();
+        let tangent2 = [
+            point2[1].atan2(point2[0]).cos() * 1000.0,
+            point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t1_path_wall_3.connect_points(self, point1, tangent1, point2, tangent2);
+
+        let mut t1_path_wall_4 = WallSection::default();
+        let point1 = t1_wall_lower_split_3.get_first_point();
+        let tangent1 = [
+            -point1[1].atan2(point1[0]).cos() * 1000.0,
+            -point1[1].atan2(point1[0]).sin() * 1000.0,
+        ];
+        let point2 = t1_wall_upper_split_3.get_first_point();
+        let tangent2 = [
+            -point2[1].atan2(point2[0]).cos() * 1000.0,
+            -point2[1].atan2(point2[0]).sin() * 1000.0,
+        ];
+        t1_path_wall_4.connect_points(self, point1, tangent1, point2, tangent2);
+
+        t1_wall_lower_split_2.join_wall(t1_path_wall_3);
+        t1_wall_lower_split_2.join_wall(t1_wall_upper_split_2);
+        t1_wall_lower_split_2.join_wall(t1_path_wall_2);
+
+        let mut t1_inner_2 = t1_wall_lower_split_2;
+
         t1_t3_wall_2.join_wall(t3_back_wall);
-        t1_t3_wall_2.join_wall(t3_t2_wall_1);
-        t1_t3_wall_2.join_wall(t3_t2_wall_closing);
-        t1_t3_wall_2.join_wall(t3_t2_wall_2);
+        t1_t3_wall_2.join_wall(t3_t2_wall_1_split_2);
+        t1_t3_wall_2.join_wall(t3_t2_path_wall_2);
+        t1_t3_wall_2.join_wall(t3_t2_wall_2_split_2);
         t1_t3_wall_2.join_wall(t2_back_wall);
-        t1_t3_wall_2.join_wall(t2_t1_wall_1);
-        t1_t3_wall_2.join_wall(t2_t1_wall_closing);
-        t1_t3_wall_2.join_wall(t2_t1_wall_2);
+        t1_t3_wall_2.join_wall(t2_t1_wall_1_split_2);
+        t1_t3_wall_2.join_wall(t2_t1_path_wall_2);
+        t1_t3_wall_2.join_wall(t2_t1_wall_2_split_2);
         t1_t3_wall_2.join_wall(t1_lower_back_wall);
-        t1_t3_wall_2.join_wall(t1_wall_lower);
-        t1_t3_wall_2.join_wall(t1_wall_closing);
-        t1_t3_wall_2.join_wall(t1_wall_upper);
+        t1_t3_wall_2.join_wall(t1_wall_lower_split_3);
+        t1_t3_wall_2.join_wall(t1_path_wall_4);
+        t1_t3_wall_2.join_wall(t1_wall_upper_split_3);
         t1_t3_wall_2.join_wall(t1_upper_back_wall);
         t1_t3_wall_2.join_wall(t1_t3_wall_1);
         t1_t3_wall_2.join_wall(t1_t3_wall_closing);
 
-        t1_t3_wall_2.render(self, 0x440088);
+        let mut outer_wall = t1_t3_wall_2;
+
+        t1_inner_1.round_to_angle(PI / 8.0);
+        t1_inner_1.remove_loops();
+        t1_inner_2.round_to_angle(PI / 8.0);
+        t1_inner_2.remove_loops();
+        t2_t1_inner.round_to_angle(PI / 8.0);
+        t2_t1_inner.remove_loops();
+        t3_t2_inner.round_to_angle(PI / 8.0);
+        t3_t2_inner.remove_loops();
+        outer_wall.round_to_angle(PI / 8.0);
+        outer_wall.remove_loops();
+
+        t1_inner_1.render(self, 0x000000);
+        t1_inner_2.render(self, 0x000000);
+
+        t2_t1_inner.render(self, 0x000000);
+        t3_t2_inner.render(self, 0x000000);
+
+        outer_wall.render(self, 0x000000);
 
         // t1_t3_wall.render(self, 0x880044);
         // t1_t3_wall_1.render(self, 0x000044);
         // t1_t3_wall_2.render(self, 0x000044);
         //
         // // t3_t2_wall.render(self, 0x880044);
-        // t3_t2_wall_1.render(self, 0x000044);
-        // t3_t2_wall_2.render(self, 0x000044);
+        // // t3_t2_wall_1.render(self, 0x000044);
+        // // t3_t2_wall_2.render(self, 0x000044);
+        // t3_t2_wall_1_split_2.render(self, 0x440088);
+        // t3_t2_wall_2_split_2.render(self, 0x440088);
+        // t3_t2_path_wall_2.render(self, 0x880044);
         //
         // // t2_t1_wall.render(self, 0x880044);
-        // t2_t1_wall_1.render(self, 0x000044);
-        // t2_t1_wall_2.render(self, 0x000044);
+        // // t2_t1_wall_1_split_1.render(self, 0x000000);
+        // t2_t1_wall_1_split_2.render(self, 0x000000);
+        // // t2_t1_wall_1.render(self, 0x000044);
+        // // t2_t1_wall_2_split_1.render(self, 0x000000);
+        // t2_t1_wall_2_split_2.render(self, 0x000000);
+        // // t2_t1_wall_2.render(self, 0x000044);
+        //
+        // // t2_t1_path_wall_1.render(self, 0x440088);
+        // t2_t1_path_wall_2.render(self, 0x440088);
         //
         // // t1_wall_inner.render(self, 0x880044);
-        // t1_wall_lower.render(self, 0x000044);
-        // t1_wall_upper.render(self, 0x000044);
+        // // t1_wall_lower.render(self, 0x000044);
+        // // t1_wall_upper.render(self, 0x000044);
+        // // t1_wall_lower_split_2.render(self, 0x000044);
+        // // t1_wall_upper_split_2.render(self, 0x000044);
+        // // t1_path_wall_2.render(self, 0x880044);
+        // t1_wall_lower_split_3.render(self, 0x000044);
+        // t1_wall_upper_split_3.render(self, 0x000044);
+        // t1_path_wall_4.render(self, 0x000044);
         //
         // t1_upper_back_wall.render(self, 0x440088);
         // t1_lower_back_wall.render(self, 0x440088);
@@ -382,10 +585,10 @@ impl Generator {
         // t2_back_wall.render(self, 0x440088);
         // t3_back_wall.render(self, 0x440088);
         //
-        // t1_wall_closing.render(self, 0x440088);
+        // // t1_wall_closing.render(self, 0x440088);
         // t1_t3_wall_closing.render(self, 0x440088);
-        // t3_t2_wall_closing.render(self, 0x440088);
-        // t2_t1_wall_closing.render(self, 0x440088);
+        // // t3_t2_wall_closing.render(self, 0x440088);
+        // // t2_t1_wall_closing.render(self, 0x440088);
     }
 
     pub fn close_walls(&mut self, lower: &WallSection, upper: &WallSection) -> WallSection {
@@ -494,163 +697,69 @@ impl Generator {
         }
 
         for road_segment in &mut road_segments {
-            let children = road_segment.extend(self, 30000.0);
+            let children = road_segment.extend(self, 40000.0);
             road_segment.render(self);
-            for child in children {
+            for child in children {s
                 child.render(self);
             }
         }
     }
 
-    fn fill_wall(&mut self, wall: &mut WallSection, length: f32, angle: f32, desired_angle: f32, desired_angle_strength: f32, distance_wall: Option<&WallSection>) {
-        let mut point = [
-            angle.cos() * SAFE_ZONE_WIDTH / 2.0,
-            angle.sin() * SAFE_ZONE_HEIGHT / 2.0,
-        ];
-
-        let inner_offset_length = self.next() * 400.0;
-        point[0] -= angle.cos() * inner_offset_length;
-        point[1] -= angle.sin() * inner_offset_length;
-
-        let mut current_wall_length = 0.0;
-        let mut current_angle = angle;
-
-        let mut optional_distance = 800.0;
-
-        wall.add_point(&point);
-        while current_wall_length < length {
-            let angle_mod = self.get_perlin_value(point[0] - 10240.0, point[1] - 10240.0, 1.0);
-            current_angle += angle_mod * PI * 0.1;
-
-            let desired_difference = MathHelper::radians_between_angles(current_angle, desired_angle);
-            current_angle += desired_difference * desired_angle_strength;
-
-            let real_current_angle = MathHelper::round_to_interval(current_angle, PI / 8.0);
-
-            let segment_length = 200.0 + 400.0 * self.next();
-
-            let dx = segment_length * real_current_angle.cos();
-            let dy = segment_length * real_current_angle.sin();
-
-            current_wall_length += (dx * dx + dy * dy).sqrt();
-
-            point[0] += dx;
-            point[1] += dy;
-
-            if let Some(distance_wall) = distance_wall {
-                let (nearest_point, nearest_distance) = distance_wall.distance_to_wall(&point);
-                if nearest_distance < optional_distance {
-                    let difference = optional_distance - nearest_distance;
-                    let dx = point[0] - nearest_point[0];
-                    let dy = point[1] - nearest_point[1];
-                    let d = (dx * dx + dy * dy).sqrt();
-                    let dx = dx / d;
-                    let dy = dy / d;
-
-                    point[0] += difference * dx;
-                    point[1] += difference * dy;
-                }
-            }
-
-            optional_distance += 200.0;
-
-            wall.add_point(&point);
-        }
-    }
-
-    fn fill_between_wall(&mut self, wall1: &WallSection, wall2: &WallSection, start_length: f32) -> [WallSection; 3] {
-        let mut distance1 = 0.0;
-        let mut distance2 = 0.0;
-
-        let mut index1: usize = 0;
-        let mut index2: usize = 0;
-
-        let mut wall_inner = WallSection::default();
-        let mut wall_lower = WallSection::default();
-        let mut wall_upper = WallSection::default();
-
-        loop {
-            if index1 >= wall1.lines.len() - 1 {
-                break;
-            }
-
-            let point = wall1.lines[index1];
-            let next_point = wall1.lines[index1 + 1];
-
-            let dx = next_point[0] - point[0];
-            let dy = next_point[1] - point[1];
-            let d = (dx * dx + dy * dy).sqrt();
-
-            if distance1 + d >= start_length {
-                break;
-            }
-
-            distance1 += d;
-            index1 += 1;
-        }
-
-        loop {
-            if index2 >= wall2.lines.len() - 1 {
-                break;
-            }
-
-            let point = wall2.lines[index2];
-            let next_point = wall2.lines[index2 + 1];
-
-            let dx = next_point[0] - point[0];
-            let dy = next_point[1] - point[1];
-            let d = (dx * dx + dy * dy).sqrt();
-
-            if distance2 + d >= start_length {
-                break;
-            }
-
-            distance2 += d;
-            index2 += 1;
-        }
-
-        let start_index1 = index1;
-        let start_index2 = index2;
-
-        while index1 < wall1.lines.len() && index2 < wall2.lines.len() {
-            let point1 = wall1.lines[index1];
-            let point2 = wall2.lines[index2];
-
-            let progress1 = (index1 as f32 - start_index1 as f32) / (wall1.lines.len() as f32 - start_index1 as f32 - 1.0);
-            let progress2 = (index2 as f32 - start_index2 as f32) / (wall2.lines.len() as f32 - start_index2 as f32 - 1.0);
-            let progress = progress1.max(progress2);
-
-            let dx = point2[0] - point1[0];
-            let dy = point2[1] - point1[1];
-            let d = (dx * dx + dy * dy).sqrt();
-            let dx = dx / d;
-            let dy = dy / d;
-
-            let maximum_thickness = d / 2.0;
-            let thickness = (200.0 + 2000.0 * progress as f32).min(maximum_thickness);
-
-            let point = [
-                (point1[0] + point2[0]) / 2.0,
-                (point1[1] + point2[1]) / 2.0,
-            ];
-
-            wall_inner.add_point(&point);
-
-            let perlin1 = (self.get_perlin_value(point[0] + 3452.0, point[1] + 3452.0, 10.0) + 1.0) / 2.0;
-            let perlin2 = (self.get_perlin_value(point[0] + 87362.0, point[1] + 87362.0, 10.0) + 1.0) / 2.0;
-            let perlin = perlin1 * perlin2;
-            let thickness_mod = perlin * 8.0 - 0.5;
-            let thickness = (thickness * thickness_mod).max(200.0).min(maximum_thickness);
-
-            wall_lower.add_point(&[point[0] - dx * thickness / 2.0, point[1] - dy * thickness / 2.0]);
-            wall_upper.add_point(&[point[0] + dx * thickness / 2.0, point[1] + dy * thickness / 2.0]);
-
-            index1 += 1;
-            index2 += 1;
-        }
-
-        return [wall_inner, wall_lower, wall_upper];
-    }
+    // fn fill_wall(&mut self, wall: &mut WallSection, length: f32, angle: f32, desired_angle: f32, desired_angle_strength: f32, distance_wall: Option<&WallSection>) {
+    //     let mut point = [
+    //         angle.cos() * SAFE_ZONE_WIDTH / 2.0,
+    //         angle.sin() * SAFE_ZONE_HEIGHT / 2.0,
+    //     ];
+    //
+    //     let inner_offset_length = self.next() * 400.0;
+    //     point[0] -= angle.cos() * inner_offset_length;
+    //     point[1] -= angle.sin() * inner_offset_length;
+    //
+    //     let mut current_wall_length = 0.0;
+    //     let mut current_angle = angle;
+    //
+    //     let mut optional_distance = 800.0;
+    //
+    //     wall.add_point(&point);
+    //     while current_wall_length < length {
+    //         let angle_mod = self.get_perlin_value(point[0] - 10240.0, point[1] - 10240.0, 1.0);
+    //         current_angle += angle_mod * PI * 0.1;
+    //
+    //         let desired_difference = MathHelper::radians_between_angles(current_angle, desired_angle);
+    //         current_angle += desired_difference * desired_angle_strength;
+    //
+    //         let real_current_angle = MathHelper::round_to_interval(current_angle, PI / 8.0);
+    //
+    //         let segment_length = 200.0 + 400.0 * self.next();
+    //
+    //         let dx = segment_length * real_current_angle.cos();
+    //         let dy = segment_length * real_current_angle.sin();
+    //
+    //         current_wall_length += (dx * dx + dy * dy).sqrt();
+    //
+    //         point[0] += dx;
+    //         point[1] += dy;
+    //
+    //         if let Some(distance_wall) = distance_wall {
+    //             let (nearest_point, nearest_distance) = distance_wall.distance_to_wall(&point);
+    //             if nearest_distance < optional_distance {
+    //                 let difference = optional_distance - nearest_distance;
+    //                 let dx = point[0] - nearest_point[0];
+    //                 let dy = point[1] - nearest_point[1];
+    //                 let d = (dx * dx + dy * dy).sqrt();
+    //                 let dx = dx / d;
+    //                 let dy = dy / d;
+    //
+    //                 point[0] += difference * dx;
+    //                 point[1] += difference * dy;
+    //             }
+    //         }
+    //
+    //         optional_distance += 200.0;
+    //
+    //         wall.add_point(&point);
+    //     }
+    // }
 
     fn create_road_bool_tiles(&mut self) -> HashMap<i32, HashMap<i32, bool>> {
         let mut tiles: HashMap<i32, HashMap<i32, bool>> = HashMap::new();
@@ -841,7 +950,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 665519500;
+        // let seed: u32 = 2996010972;
 
         // TODO cursed seed to try before finalizing
         // let seed: u32 = 1835892476;
