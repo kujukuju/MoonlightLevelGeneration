@@ -175,6 +175,7 @@ impl RoadSegment {
                 continue;
             }
 
+            // TODO this angle value cant be correct can it be?
             let point = [
                 edge_point[0] + angle.cos() * (thickness + TEXTURE_WIDTH as f32 * 0.0),
                 edge_point[1] + angle.sin() * (thickness + TEXTURE_HEIGHT as f32 * 0.0),

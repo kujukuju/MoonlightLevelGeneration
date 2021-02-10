@@ -39,7 +39,7 @@ pub struct Generator {
     seed: i64,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Angle(pub f32);
 
 impl PartialEq for Angle {
@@ -613,6 +613,7 @@ impl Generator {
         let max = width.max(height);
         for angle in 0..200 {
             let angle = (angle as f32 / 200.0) * PI * 2.0;
+            println!("{:.32?}", angle);
 
             let point = [angle.cos() * max, angle.sin() * max];
             let (point, distance) = MathHelper::distance_to_ellipse(center_x, center_y, width / 2.0, height / 2.0, &point);
@@ -629,6 +630,8 @@ impl Generator {
         sorted_tiles.sort_by(|first, second| {
             return first.0.partial_cmp(&second.0).unwrap();
         });
+
+        println!("sorted tiles {:?}", sorted_tiles);
 
         // find the first grass tile to start on, to ensure no roads are cut in half
         let mut start_index = 0;
@@ -689,6 +692,7 @@ impl Generator {
 
                 // this is bad
 
+                println!("creating at {:?} {:?} {:?}", center, start_angle.0, end_angle.0);
                 road_segments.push(RoadSegment::create(self, center, start_angle.0, end_angle.0, d));
 
                 start_road_segment = None;
@@ -775,15 +779,15 @@ impl Generator {
             [width / 2, height / 2],
         ];
 
-        for x in (-(LEVEL_WIDTH as i32) / 2)..(LEVEL_WIDTH as i32 / 2) {
+        for x in (-(LEVEL_WIDTH as i32) / 2)..=(LEVEL_WIDTH as i32 / 2) {
             let tiles = tiles.entry(x).or_default();
 
-            for y in (-(LEVEL_HEIGHT as i32) / 2)..(LEVEL_HEIGHT as i32 / 2) {
+            for y in (-(LEVEL_HEIGHT as i32) / 2)..=(LEVEL_HEIGHT as i32 / 2) {
                 let inside_center = true;
                 let inside_center = inside_center && x >= aabb[0][0];
-                let inside_center = inside_center && x < aabb[1][0];
+                let inside_center = inside_center && x <= aabb[1][0];
                 let inside_center = inside_center && y >= aabb[0][1];
-                let inside_center = inside_center && y < aabb[1][1];
+                let inside_center = inside_center && y <= aabb[1][1];
 
                 if inside_center {
                     let dx = (x - center_x) as f32 / (width as f32 / 2.0);
@@ -950,7 +954,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        // let seed: u32 = 424276968;
+        let seed: u32 = 1991568964;
 
         // TODO cursed seed to try before finalizing
         // let seed: u32 = 1835892476;
