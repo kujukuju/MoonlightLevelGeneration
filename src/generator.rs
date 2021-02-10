@@ -118,6 +118,9 @@ impl Generator {
             }
         }
 
+        // calculate the road segments at the exact edge of the safe zone
+        self.generate_roads(0.0, 0.0, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, 0xff0000, 0.8);
+
         // safe zone
         self.draw_oval(0.0, 0.0, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, 0x39a8e7, 0.5);
 
@@ -200,9 +203,6 @@ impl Generator {
         let mut t3_t2_wall_closing = self.close_walls(&t3_t2_wall_1, &t3_t2_wall_2);
 
         let mut t2_t1_wall_closing = self.close_walls(&t2_t1_wall_1, &t2_t1_wall_2);
-
-        // calculate the road segments at the exact edge of the safe zone
-        self.generate_roads(0.0, 0.0, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, 0xff0000, 0.8);
 
         // back walls
         let tangent_strength = 24000.0;
@@ -950,7 +950,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         let seed: u32 = rand::random();
-        let seed: u32 = 424276968;
+        // let seed: u32 = 424276968;
 
         // TODO cursed seed to try before finalizing
         // let seed: u32 = 1835892476;
